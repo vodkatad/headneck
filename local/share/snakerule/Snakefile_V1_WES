@@ -59,6 +59,7 @@ rule to_matrix:
     run:
         import pandas as pd
         long_df = pd.read_csv(input.long, sep="\t", index_col=0)
+        long_df = long_df.drop_duplicates()
         pi = long_df.pivot(columns="Tumor_Sample_Barcode", values="VAF")
         pi = pi.fillna(0)
         pi.to_csv(output.mat, sep="\t")
@@ -71,7 +72,6 @@ rule pivot_to_genes:
         import pandas as pd
         mat = pd.read_csv(input.mat, sep="\t", index_col=0)
         annot = pd.read_csv(input.annot, sep="\t", index_col=1)
-        mat = mat.drop_duplicates()
         annot = annot.drop_duplicates()
         annot = annot.drop(columns=['HGVSp_Short', 'Consequence'])
         m = mat.join(annot)
@@ -96,13 +96,33 @@ rule af_filter_preproc:
     log: log="preprocGene_AF_{AF}.log"
     script: SRC_DIR+'/preproc_af_genes.R'
 
+rule filter_preproc:
+    input: matH="human_matrix_fx.tsv", matX="xeno_matrix_fx.tsv"
+    output: preprocAF="preproc.Rdata"
+    log: log="preproc.log"
+    script: SRC_DIR+'/preproc.R'
+
 rule oncoprint:
     input: Rimage='preprocGeneAF_{AF}.Rdata'
-    output: op="oncoprint_{AF}.pdf", op_data="oncoprint_{AF}.RData", pie="oncoprint_pie_{AF}.pdf"
+    output: op="oncoprint_{AF}.pdf", op_data="oncoprint_{AF}.RData", pie="oncoprint_pie_{AF}.pdf", n_muts="oncoprint_nmuts_{AF}.tsv"
+    log: log="oncoprint_{AF}.log"
     script: SRC_DIR+"/oncoprint_diff.R"
 
+# needed variables pdo/pdx:
+# > head(pdx)
+#                                  CRC0022 CRC0030 CRC0031 CRC0051 CRC0055
+#chr1:11109319:A:T                       0       0       0       0       0
+#chr1:11126778:G:A                       0       0       0       0       0
+#chr1:11127762:C:G                       0       0       0       0       0
 
-# rule jaccard
+rule jaccard_mut_sim:
+    input: Rimage='preproc.Rdata'
+    output: pheat="jaccard_heat_{AF}.pdf", density="jaccard_density_{AF}.pdf", violin="jaccard_violin_{AF}.pdf", violin2="jaccard_violin2_{AF}.pdf", jac_f="jac_matrix_{AF}.tsv", mw="jac_MW_{AF}.txt"
+    script: SRC_DIR+"/jaccard_mut_sim.R"
 
-
-# rule AF imbalance
+rule AF_imbalance:
+    input: Rimage='preproc.Rdata', annot="gene_annot_fx.tsv"
+    output: ttest="AF_imbalance_test_{AF}.tsv", plots=directory("AF_imbalance_{AF}_plots")
+    log: log="AF_imbalance_log_{AF}.log"
+    params: muts_thr=5
+    script: SRC_DIR+"/AF_imbalance.R"
