@@ -1,0 +1,37 @@
+import os
+def find_prj_root(path=os.getcwd()):
+    if os.path.isfile(os.path.join(path,'.PRJ_ROOT')):
+        return path
+    else:
+        if path:
+            return find_prj_root(os.path.dirname(path))
+        else:
+            raise Exception('Can not find the PRJ_ROOT directory')
+
+PRJ_ROOT=find_prj_root()
+BIOINFO_ROOT = os.getenv('BIOINFO_ROOT')
+SNAKE_ROOT=os.getenv('SNAKE_ROOT')
+
+BIN_DIR=PRJ_ROOT+'/local/bin'
+SRC_DIR=PRJ_ROOT+'/local/src'
+
+
+MAF_X=PRJ_ROOT+'/local/share/data/X_AllSamples_withVAF.maf'
+MAF_H=PRJ_ROOT+'/local/share/data/H_AllSamples_withVAF.maf'
+
+#REMOVE_CONS='3_prime_UTR_variant\\n5_prime_UTR_variant\\ndownstream_gene_variant\\nintergenic_variant\\nintron_variant\\ni'
+KEEP_CONS="frameshift_variant\\ninframe_deletion\\ninframe_insertion\\nmissense_variant\\nprotein_alterating_variant\\nstop_gained"
+# stop_lost start_lost stop_retained_variant
+# we do not keep coding_sequence_variant:
+#egrassi@ulisse:/mnt/cold1/snaketree/prj/hn/dataset/V1/WES$ cut -f 4 gene_annot.tsv |sort | uniq -c | grep --color coding
+#      3 coding_sequence_variant,5_prime_UTR_variant
+#      1 intron_variant,non_coding_transcript_variant
+#      8 non_coding_transcript_exon_variant
+#      7 splice_acceptor_variant,coding_sequence_variant
+#     18 splice_acceptor_variant,coding_sequence_variant,intron_variant
+#      2 splice_acceptor_variant,splice_donor_variant,coding_sequence_variant,intron_variant
+#      4 splice_donor_variant,coding_sequence_variant
+#      1 splice_donor_variant,coding_sequence_variant,5_prime_UTR_variant,intron_variant
+#     34 splice_donor_variant,coding_sequence_variant,intron_variant
+#      8 splice_donor_variant,splice_acceptor_variant,coding_sequence_variant,intron_variant
+#      1 splice_region_variant,intron_variant,non_coding_transcript_variant

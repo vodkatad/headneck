@@ -1,0 +1,108 @@
+include: "conf.sk"
+
+# Preprocessing steps will need to create two matrixes: pdxbing and pdobing, with this format:
+#> head(pdxbing)
+#      CRC0022 CRC0030 CRC0031 CRC0051 CRC0055 CRC0059 CRC0065 CRC0066 CRC0069
+#NRAS     TRUE   FALSE   FALSE   FALSE   FALSE   FALSE   FALSE   FALSE   FALSE
+#MYC      TRUE   FALSE   FALSE   FALSE   FALSE   FALSE   FALSE   FALSE   FALSE
+#TP53     TRUE    TRUE    TRUE    TRUE    TRUE    TRUE   FALSE   FALSE    TRUE
+# Maf relevant columns: Hugo_Symbol, Tumor_Sample_Barcode, VAF, AF? (no its'empty), Chromosome, Start_Position, Reference_Allele, Tumor_Seq_Allele1
+# Consequence HGVSp_Short
+
+# Maf is a strange format:
+#egrassi@ulisse:/mnt/cold1/snaketree/prj/hn/dataset/V1/WES$ cat ../../../local/share/data/X_AllSamples_withVAF.maf  |cut -f 1,5,6,11,12,13,16,37,51,77,134 | bawk '$4 == $5' | wc -l
+#24751
+#egrassi@ulisse:/mnt/cold1/snaketree/prj/hn/dataset/V1/WES$ cat ../../../local/share/data/X_AllSamples_withVAF.maf  |cut -f 1,5,6,11,12,13,16,37,51,77,134 | bawk '$4 != $5' | wc -l
+#1
+
+# Will start creating a long format tsv for single muts and a gene annotation
+rule preprocess_to_single_muts:
+    input: x=MAF_X, h=MAF_H
+    output: gene_annot="gene_annot.tsv", long_x="xeno_long.tsv", long_h="human_long.tsv"
+    shell: 
+        """
+            cut -f 1,5,6,11,12,13,16,37,51,134 {input.x} | tr -d '"' | bawk '{{print $2"_"$3"_"$4":"$6,$1,$7,$8,$9,$10}}' > {output.long_x}
+            cut -f 1,5,6,11,12,13,16,37,51,134 {input.h} | tr -d '"' | bawk '{{print $2"_"$3"_"$4":"$6,$1,$7,$8,$9,$10}}' > {output.long_h}
+            cat {input.x} {input.h} | cut -f 1,5,6,11,12,13,16,37,51,134 | tr -d '"' | bawk '{{print $1, $2"_"$3"_"$4":"$6, $8, $9}}' > {output.gene_annot}
+        """
+
+
+# Some replicates:
+#egrassi@ulisse:/mnt/cold1/snaketree/prj/hn/dataset/V1/WES$ grep -f o gene_annot.tsv 
+#IL17RC  chr3_9918409_GGTGAGGAGAACCTGGCTGGCCCAACTGCCCCATGCCAAGGCCTGGCCTGCCGCTCCTGGGCCTGACTGACCCCTGCCCTGTTGCCCACA:-       p.X190_splice   splice_acceptor_variant,splice_donor_variant,coding_sequence_variant,intron_variant
+#IL17RC  chr3_9918409_GGTGAGGAGAACCTGGCTGGCCCAACTGCCCCATGCCAAGGCCTGGCCTGCCGCTCCTGGGCCTGACTGACCCCTGCCCTGTTGCCCACA:-       p.X190_splice   splice_donor_variant,splice_acceptor_variant,coding_sequence_variant,intron_variant
+#KRT6A   chr12_52487956_CTGTGATGGGGAGGGGACAAGGACACAAGAAGCCATGGTGAGCTCATCCTGTCAGCCTGAGCCCAGTCAGAAGAGTGCGAGGGCAGGGGAGGAAGGCAAGCAAAGGTACTTAC:-      p.X487_splice   splice_acceptor_variant,splice_donor_variant,intron_variant
+#KRT6A   chr12_52487956_CTGTGATGGGGAGGGGACAAGGACACAAGAAGCCATGGTGAGCTCATCCTGTCAGCCTGAGCCCAGTCAGAAGAGTGCGAGGGCAGGGGAGGAAGGCAAGCAAAGGTACTTAC:-      p.X487_splice   splice_donor_variant,splice_acceptor_variant,intron_variant
+#KRT6A   chr12_52490733_CCTGCAGAACAGAAGGTCATAAGATCAACTTCACTTCCGATATTTACAGAGATACCCAACCCTATACATCTTCTCCCCTTTGCAGACCCCATCAGAGTAAACAGAAGGATGGTGGAGATGCTTA:-   p.X304_splice   splice_acceptor_variant,splice_donor_variant,coding_sequence_variant,intron_variant
+#KRT6A   chr12_52490733_CCTGCAGAACAGAAGGTCATAAGATCAACTTCACTTCCGATATTTACAGAGATACCCAACCCTATACATCTTCTCCCCTTTGCAGACCCCATCAGAGTAAACAGAAGGATGGTGGAGATGCTTA:-   p.X304_splice   splice_donor_variant,splice_acceptor_variant,coding_sequence_variant,intron_variant
+
+rule keep_onlyfunc:
+    input: gene_annot="gene_annot.tsv", long_x="xeno_long.tsv", long_h="human_long.tsv"
+    output: gene_annot="gene_annot_fx.tsv", long_x="xeno_long_fx.tsv", long_h="human_long_fx.tsv"
+    params: keep=KEEP_CONS
+    shell: 
+        """
+            echo -e "{params.keep}" > {output.gene_annot}.tmp
+            head -n1 {input.long_x} > {output.long_x}
+            head -n1 {input.long_h} > {output.long_h}
+            head -n1 {input.gene_annot} > {output.gene_annot}
+            grep -w -f {output.gene_annot}.tmp {input.gene_annot} >> {output.gene_annot}
+            grep -w -f {output.gene_annot}.tmp {input.long_x} >> {output.long_x}
+            grep -w -f {output.gene_annot}.tmp {input.long_h} >> {output.long_h}
+            rm {output.gene_annot}.tmp
+        """
+
+# WARNING: upto here lots of duplicates! Removed when collapsing at the gene level right now.
+rule to_matrix:
+    input: long="{kind}_long_fx.tsv"
+    output: mat="{kind}_matrix_fx.tsv"
+    run:
+        import pandas as pd
+        long_df = pd.read_csv(input.long, sep="\t", index_col=0)
+        pi = long_df.pivot(columns="Tumor_Sample_Barcode", values="VAF")
+        pi = pi.fillna(0)
+        pi.to_csv(output.mat, sep="\t")
+
+
+rule pivot_to_genes:
+    input: mat="{kind}_matrix_fx.tsv", annot="gene_annot_fx.tsv"
+    output: mat="{kind}_gene_matrix.tsv"
+    run:
+        import pandas as pd
+        mat = pd.read_csv(input.mat, sep="\t", index_col=0)
+        annot = pd.read_csv(input.annot, sep="\t", index_col=1)
+        mat = mat.drop_duplicates()
+        annot = annot.drop_duplicates()
+        annot = annot.drop(columns=['HGVSp_Short', 'Consequence'])
+        m = mat.join(annot)
+        # There should be annotations for all muts otherwise something is off
+        assert m.shape[0] == mat.shape[0], 'Mh, annot and muts are not aligned!'
+        # We group on the gene and aggregate using max as a function: 
+        # we get the higher AF for samples with multiple muts on each gene
+        res = m.groupby('Hugo_Symbol').agg(max)
+        res.to_csv(output.mat, sep="\t")
+
+
+#> summary(unlist(d[d!=0]))
+#    Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
+#0.002976 0.071429 0.282051 0.295323 0.465116 1.000000 
+#> summary(unlist(d2[d2!=0]))
+#    Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
+#0.005242 0.043478 0.120000 0.171354 0.261261 0.877193 
+# xeno is d, human is d2
+rule af_filter_preproc:
+    input: matH="human_gene_matrix.tsv", matX="xeno_gene_matrix.tsv"
+    output: preprocAF="preprocGeneAF_{AF}.Rdata"
+    log: log="preprocGene_AF_{AF}.log"
+    script: SRC_DIR+'/preproc_af_genes.R'
+
+rule oncoprint:
+    input: Rimage='preprocGeneAF_{AF}.Rdata'
+    output: op="oncoprint_{AF}.pdf", op_data="oncoprint_{AF}.RData", pie="oncoprint_pie_{AF}.pdf"
+    script: SRC_DIR+"/oncoprint_diff.R"
+
+
+# rule jaccard
+
+
+# rule AF imbalance
