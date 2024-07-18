@@ -126,3 +126,49 @@ rule AF_imbalance:
     log: log="AF_imbalance_log_{AF}.log"
     params: muts_thr=5
     script: SRC_DIR+"/AF_imbalance.R"
+
+### mixed AF thr
+wildcard_constraints: AF='\d\.\d+'
+
+rule af_filter_preproc_mixed:
+    input: matH="human_gene_matrix.tsv", matX="xeno_gene_matrix.tsv"
+    output: preprocAF="preprocGeneAF_{XAF}_{HAF}.Rdata"
+    log: log="preprocGene_AF_{XAF}_{HAF}.log"
+    script: SRC_DIR+'/preproc_af_genes_mixed.R'
+
+rule oncoprint_mixed:
+    input: Rimage='preprocGeneAF_{XAF}_{HAF}.Rdata'
+    output: op="oncoprint_{XAF}_{HAF}.pdf", op_data="oncoprint_{XAF}_{HAF}.RData", pie="oncoprint_pie_{XAF}_{HAF}.pdf", n_muts="oncoprint_nmuts_{XAF}_{HAF}.tsv"
+    log: log="oncoprint_{XAF}_{HAF}.log"
+    script: SRC_DIR+"/oncoprint_diff.R"
+
+rule jaccard_mut_sim_mixed:
+    input: Rimage='preproc.Rdata'
+    output: pheat="jaccard_heat_{XAF}_{HAF}.pdf", jac_f="jac_matrix_{XAF}_{HAF}.tsv", mw="jac_MW_{XAF}_{HAF}.txt"
+    script: SRC_DIR+"/jaccard_mut_sim_mixed.R"
+
+
+## vs TCGA
+rule tcga:
+    input: PRJ_ROOT+"/local/share/data/Mutated_Genes_TCGA_FirehoseLegacy_240718.txt"
+    output: "TCGA_freqs.tsv"
+    shell: 
+        """
+            sed 1d {input} | bawk '{{print $1,$4/$5}}' > {output}
+        """
+
+rule H_freq:
+    input: "preprocGeneAF_{VAF}.Rdata"
+    output: "human_freqs_{VAF}.tsv"
+    shell:
+        """
+            Rscript -e "load('{input}'); df <- as.data.frame(rowSums(pdobing)/ncol(pdobing)); write.table(df, '{output}', sep='\\t', row.names=T, col.names=F, quote=F)"
+        """
+
+rule tcga_sign:
+    input: PRJ_ROOT+"/local/share/data/Mutated_Genes_TCGA_FirehoseLegacy_240718.txt"
+    output: "TCGA_sign.tsv"
+    shell: 
+        """
+            sed 1d {input} | bawk '$2 < 0.05 && $2 !=""{{print $1}}' > {output}
+        """

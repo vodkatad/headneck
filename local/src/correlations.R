@@ -221,3 +221,16 @@ tmm_cors[[1]][['plot']]
 #egrassi@ulisse:/mnt/cold1/snaketree/prj/hn/dataset/V1/WES$ grep TP53 human_long_fx.tsv  | grep HNC0148
 #egrassi@ulisse:/mnt/cold1/snaketree/prj/hn/dataset/V1/WES$ grep TP53 human_long_fx.tsv  | grep HNC0151
 #egrassi@ulisse:/mnt/cold1/snaketree/prj/hn/dataset/V1/WES$ grep TP53 human_long_fx.tsv  | grep HNC0164
+
+
+## 
+wanted <- c('HNC0029',
+'HNC0032',
+'HNC0050')
+
+ww <- sapply(wanted, function(x) { grepl(x, colnames(tmm))})
+www <- apply(ww, 1, any)
+
+three_tmm <- tmm[, www]
+
+write.table(three_tmm, 'three_tmm.tsv', sep="\t", quote=FALSE)
