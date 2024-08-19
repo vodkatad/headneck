@@ -170,5 +170,5 @@ rule tcga_sign:
     output: "TCGA_sign.tsv"
     shell: 
         """
-            sed 1d {input} | bawk '$2 < 0.05 && $2 !=""{{print $1}}' > {output}
+            sed 1d {input} | bawk '$2 < 0.1 && $2 !=""{{print $1}}' > {output}
         """

@@ -1,0 +1,117 @@
+include: "conf.sk"
+
+rule qc_plots:
+    input: counts=COUNTS_ALL, metadata=METADATA_ALL
+    output: "dds.Rdata","tmm.tsv.gz", "vsd.tsv.gz"
+    params: tool=BIN_DIR+"/deseq2_qc_nolen", design="~Site+Cetuximab_Response+type", prefix="all", minc=5, minsamples=2, cores=CORES
+    shell:
+        """
+            {params.tool} {input.counts} {input.metadata} {params.design} {params.prefix} {params.minc} {params.minsamples} {output} {params.cores}
+        """
+
+# rule de:
+#     input: "dds.Rdata"
+#     output: tsv="{what}_cutoff{alpha}-{nom}.vs.{den}.deseq2.tsv", volcano="{what}_cutoff{alpha}-{nom}.vs.{den}.deseq2.pdf"
+#     params: threads=CORES, alpha="{alpha}", factor="{what}", nom="{nom}", den="{den}", lfc=LFC
+#     script: SRC_DIR+"/deseq2_diff.R"
+
+rule de:
+    input: "dds.Rdata"
+    output: tsv="{what}_cutoff{alpha}-{nom}.vs.{den}.deseq2.tsv", volcano="{what}_cutoff{alpha}-{nom}.vs.{den}.deseq2.pdf"
+    params: threads=CORES, alpha="{alpha}", factor="{what}", nom="{nom}", den="{den}", lfc=LFC
+    script: SRC_DIR+"/deseq2_diff_newvolcano.R"
+
+
+rule go_input_up_down:
+    input: "{what}_cutoff{alpha}-{nom}.vs.{den}.deseq2.tsv"
+    output: up = "{what}_cutoff{alpha}-{nom}.vs.{den}.goinsplit_up.tsv", down = "{what}_cutoff{alpha}-{nom}.vs.{den}.goinsplit_down.tsv"
+    params: thr=PVAL, specie=SPECIES, lfc=LFC
+    shell:
+        """
+            sed 1d {input} | bawk '$7 < {params.thr} &&  $3 > {params.lfc} {{print $1}} ' | perl -pane 's/^{params.specie}_(.+)/$1/g' > {output.up}
+            sed 1d {input} | bawk '$7 < {params.thr} &&  $3 < - {params.lfc} {{print $1}} ' | perl -pane 's/^{params.specie}_(.+)/$1/g' > {output.down}
+        """
+
+rule go_universe:
+    input: "{what}_cutoff{alpha}-{nom}.vs.{den}.deseq2.tsv"
+    output: "{what}_cutoff{alpha}-{nom}.vs.{den}.gouniverse.tsv"
+    params: specie=SPECIES
+    shell:
+        """
+            sed 1d {input} | cut -f 1 | perl -pane 's/^{params.specie}_(.+)/$1/g' > {output}
+        """
+
+## genidaeliminarehn diventa il go_up per vedere in che ontologie si dividono
+
+rule go_analysis_plot:
+    input: gene_list= "{what}_cutoff{alpha}-{nom}.vs.{den}.goinsplit_{direction}.tsv", gene_univ = "{what}_cutoff{alpha}-{nom}.vs.{den}.gouniverse.tsv"
+    output: GO_r = "GO_results_{what}_cutoff{alpha}-{nom}.vs.{den}_{direction}.tsv", out_dir=directory('barplot_go_{what}_cutoff{alpha}-{nom}.vs.{den}_{direction}')
+    script: SRC_DIR+'/GO_analysis.R'
+
+
+rule gsea_input_2:
+    input: "{what}_cutoff{alpha}-{nom}.vs.{den}.deseq2.tsv"
+    output: "{what}_cutoff{alpha}-{nom}.vs.{den}.gseain_2.tsv"
+    params: lfc=LFC, thr=PVAL, specie=SPECIES
+    shell:
+        """
+            echo -e "gene\\tFreq" > {output}
+            sed 1d {input} | bawk '{{print $1, $3}}' | perl -pane 's/^{params.specie}_(.+)/$1/g' >> {output}
+        """
+
+## commentare e scommentare questa gia secondo necissità di avere le gsea classiche o le sottoclassi
+
+rule gsea_analysis_plot:
+    input: gene_res_freq = "{what}_cutoff{alpha}-{nom}.vs.{den}.gseain_2.tsv"
+    output: GSEA_r = "GSEA_{msign}_results_{what}_cutoff{alpha}-{nom}.vs.{den}.tsv", GSEA_ridgeplot = "gsea_{msign}_ridgeplot_{what}_cutoff{alpha}-{nom}.vs.{den}.pdf"
+    script: SRC_DIR+'/GSEA_analysis.R'
+
+# rule gsea_analysis_plot_subclass:
+#     input: gene_res_freq = "{what}_cutoff{alpha}-{nom}.vs.{den}.gseain_2.tsv"
+#     output: GSEA_r = "GSEA_{msign}_CP_results_{what}_cutoff{alpha}-{nom}.vs.{den}.tsv", GSEA_ridgeplot = "gsea_{msign}_CP_ridgeplot_{what}_cutoff{alpha}-{nom}.vs.{den}.pdf"
+#     script: SRC_DIR+'/GSEA_analysis_subclass.R'
+
+rule gsea_input_rnk:
+    input: "{what}_cutoff{alpha}-{nom}.vs.{den}.gseain_2.tsv"
+    output: "{what}_cutoff{alpha}-{nom}.vs.{den}.gseain.rnk"
+    shell: 
+        """ 
+            echo -e "#gene\\trank" > {output}
+            sed 1d {input} >> {output}
+        """
+
+rule cls:
+    input: samples=METADATA, expr="tmm.tsv.gz"
+    output: clsf="{what}_{nom}.vs.{den}.cls"
+    script: SRC_DIR+'/clsize_open.R'
+
+rule metric_gct:
+    input: "{metric}.tsv.gz"
+    output: "{metric}.gct"
+    params: specie=SPECIES, tool=BIN_DIR+'/gctize'
+    shell:
+        """
+            zcat {input} | head -n 1 > {output}.tmp || echo 'plh'
+            zcat {input} | sed 1d | sed 's/^{params.specie}_//1' >> {output}.tmp
+            echo "#1.2" > {output}
+            NROW=`cat {output}.tmp | sed 1d | wc -l`
+            NCOL=`head -n1 {output}.tmp | bawk '{{print NF}}'` 
+            echo -e "$NROW\\t$NCOL" >> {output}
+            {params.tool} {output}.tmp {output}
+            rm {output}.tmp
+        """
+
+def definput(wildcards):
+    if (wildcards.expr == "fpkm"):
+        return {'expr': "fpkm.tsv.gz"}
+    else:
+        return {'expr': "tmm.tsv.gz"}
+
+rule score:
+   input: unpack(definput), genes=MARKER
+   params: tool=BIN_DIR+"/lymphoma_score"
+   output: "{expr}_lymphoma_scores.tsv.gz"
+   shell:
+       """
+           {params.tool} -e {input.expr} -g {input.genes} -o {output}
+       """

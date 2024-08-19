@@ -12,8 +12,7 @@ names(d) <- gsub('PN0039B.', '', names(d), fixed=T) # uffa per far cosi` ogni vo
 #> unique(sapply(strsplit(colnames(d),"_"), '[[', 2))
 #[1] "graft"
 names(d) <- gsub('_graft', '', names(d), fixed=T)
-#> dim(d)
-#[1] 60583   108
+
 
 ## filtering expression data: we want high sd genes but not clear outliers / not expressed genes
 # filter not expressed genes
@@ -21,30 +20,17 @@ means <- apply(d, 1, mean)
 med <- median(means)
 
 de <- d[means > med,]
-# dim(de)
-#[1] 30291   108
+
 sds <- apply(de, 1, sd)
 # there are some very high sd?
 #    Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
 #0.9      5.6     28.9    354.0    149.4 860110.9 
-#> noisy_genes_thr
-#90% 
-#425.0408 
+#noisy_genes_thr <- quantile(sds, 0.9)
 
-osds <- sds[order(sds)]
+#de <- de[sds < noisy_genes_thr,]
+#sds <- sds[sds < noisy_genes_thr]
 
-noisy_genes_thr <- quantile(sds, 0.9)
-#> table(sds < noisy_genes_thr)
-#
-#FALSE  TRUE 
-#3030 27261 
-removed <- rownames(de)[sds >= noisy_genes_thr]
-dd <- write.table(data.frame(gene=removed), file="/tmp/noisy.tsv", sep="\t", row.names=F, col.names=F, quote=F)
-  
-de <- de[sds < noisy_genes_thr,]
-sds <- sds[sds < noisy_genes_thr]
-
-# now we keep thet top 10% variable genes 
+# now we keep the top 10% variable genes 
 sds <- sds[order(-sds)]
 
 n <- length(sds)
@@ -52,8 +38,6 @@ keep <- head(sds, round(0.10*n))
 keep_genes <- names(keep)
 desd <- de[rownames(de) %in% keep_genes,]
 
-#> length(keep_genes)
-#[1] 2726
 
 ## build correspondences of human/pdx
 # ids here are "HNC0002PRH00" "HNC0002PRX0A" 
@@ -101,7 +85,7 @@ pairsdf <- do.call(rbind, pairs)
 # > length(tt[tt==1])
 # [1] 23
 
-method <- 'spearman'
+method <- 'pearson'
 
 get_cor <- function(pair, data, method="spearman") {
   # we are sure that we will always find a match because we have build samples coming from our data itself
@@ -131,17 +115,14 @@ wrong_pairs <- as.data.frame(t(apply(pairsdf_wrong, 1, get_cor, desd, method)))
 
 colnames(right_pairs) <- c(method, 'pvalue')
 colnames(wrong_pairs) <- c(method, 'pvalue')
-wrong_pairs$pairing <- 'Unmatched'
-right_pairs$pairing <- 'Matched'
+wrong_pairs$pairing <- 'wrong'
+right_pairs$pairing <- 'right'
 
 m <- rbind(right_pairs, wrong_pairs)
 
 ggplot(m, aes_string(x="pairing", y=method, fill="pairing"))+geom_violin()+theme_bw()+scale_fill_manual(values=c("darkgoldenrod","darkgreen"))+theme(text=element_text(size=15))+geom_signif(comparisons=list(c('right','wrong')))
 
-ggplot(m, aes_string(x="pairing", y=method, fill="pairing"))+geom_boxplot(outlier.shape = NA)+
-geom_jitter()+theme_bw()+scale_fill_manual(values=c("darkgoldenrod","darkgreen"))+
-theme(text=element_text(size=15))+
-geom_signif(comparisons=list(c('Matched','Unmatched')))+ylab('Spearman')+xlab('Pairs')
+ggplot(m, aes_string(x="pairing", y=method, fill="pairing"))+geom_boxplot(outlier.shape = NA)+geom_jitter(height=NULL)+theme_bw()+scale_fill_manual(values=c("darkgoldenrod","darkgreen"))+theme(text=element_text(size=15))+geom_signif(comparisons=list(c('right','wrong')))
 
 
 #> check <- cbind(right_pairs, pairsdf)
@@ -172,7 +153,7 @@ keep_genes <- names(keep)
 
 desd <- de[rownames(de) %in% keep_genes,]
 
-method <- 'spearman'
+method <- 'pearson'
 
 right_pairs <- as.data.frame(t(apply(pairsdf, 1, get_cor, desd, method)))
 wrong_pairs <- as.data.frame(t(apply(pairsdf_wrong, 1, get_cor, desd, method)))
@@ -188,4 +169,6 @@ m <- rbind(right_pairs, wrong_pairs)
 ggplot(m, aes_string(x="pairing", y=method, fill="pairing"))+geom_boxplot(outlier.shape = NA)+geom_jitter()+theme_bw()+scale_fill_manual(values=c("darkgoldenrod","darkgreen"))+theme(text=element_text(size=15))+geom_signif(comparisons=list(c('right','wrong')))
 
 
+#
+p <- cbind(pairsdf, right_pairs)
 

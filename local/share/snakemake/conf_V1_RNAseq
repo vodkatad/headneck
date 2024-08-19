@@ -17,4 +17,19 @@ SRC_DIR=PRJ_ROOT+'/local/src'
 
 COUNTS=PRJ_ROOT+'/local/share/data/Merged_raw_counts_noCRLF.txt'
 METADATA=PRJ_ROOT+'/local/share/data/SampleTablenoCRLF.txt'
+COUNTS_H=PRJ_ROOT+'/local/share/data/Merged_raw_counts_human.txt'
+METADATA_H=PRJ_ROOT+'/local/share/data/SampleTableHuman.txt'
+COUNTS_ALL=PRJ_ROOT+'/local/share/data/Merged_all_counts_hx.txt'
+METADATA_ALL=PRJ_ROOT+'/local/share/data/SampleTable_hx.txt'
 CORES=6
+LFC=0.5849625 # 1.5 FC
+PVAL=0.05
+SPECIES="all"
+
+MARKER= "/mnt/cold1/snaketree/prj/hn/local/share/data/marker_genes_lymphoma.txt"
+
+rule de_geni_scelti:
+    input: "dds.Rdata"
+    output: tsv="{what}_cutoff{alpha}-{nom}.vs.{den}.deseq2_geni_scelti.tsv", volcano="{what}_cutoff{alpha}-{nom}.vs.{den}.deseq2_geni_scelti.pdf"
+    params: threads=CORES, alpha="{alpha}", factor="{what}", nom="{nom}", den="{den}", lfc=LFC
+    script: SRC_DIR+"/deseq2_diff_volcano_geni_scelti_hn.R"
