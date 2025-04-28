@@ -35,3 +35,4 @@ KEEP_CONS="frameshift_variant\\ninframe_deletion\\ninframe_insertion\\nmissense_
 #     34 splice_donor_variant,coding_sequence_variant,intron_variant
 #      8 splice_donor_variant,splice_acceptor_variant,coding_sequence_variant,intron_variant
 #      1 splice_region_variant,intron_variant,non_coding_transcript_variant
+DATA_DIR=PRJ_ROOT+'/local/share/data'

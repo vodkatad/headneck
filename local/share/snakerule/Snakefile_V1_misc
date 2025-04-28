@@ -1,0 +1,6 @@
+include: "conf.sk"
+
+rule chisq_ck:
+	input: n=DATA_DIR+"/citokeratins_{class}.tsv"
+	output: stat="citokeratins_{class}.txt"
+	script: SRC_DIR+"/chisq_fisher.R"
