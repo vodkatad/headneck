@@ -1,4 +1,8 @@
-vsd <- "/mnt/cold1/snaketree/prj/hn/dataset/V1/RNAseq/umani/vsd.tsv.gz"
+library(pheatmap)
+library(openxlsx)
+library(dplyr)
+
+vsd <- "/mnt/cold1/snaketree/prj/hn/dataset/V1/RNAseq/xeno/vsd.tsv.gz"
 vsd <- read.table(vsd, quote = "", sep = "\t", header = TRUE, stringsAsFactors = FALSE)
 
 library(ALL) 
@@ -24,7 +28,7 @@ results[[2]][["consensusMatrix"]][1:5,1:5]
 results[[2]][["consensusTree"]]
 
 d <- as.matrix(vsd)
-title <- "/home/mferri/prova27"
+
 results = ConsensusClusterPlus(d, # normalized expression matrix
                                maxK=6, # maximum k to make clusters
                                reps=50, # resampling
@@ -100,9 +104,7 @@ vsd <- "/mnt/cold1/snaketree/prj/hn/dataset/V1/RNAseq/umani/vsd.tsv.gz"
 vsd <- read.table(vsd, quote = "", sep = "\t", header = TRUE, stringsAsFactors = FALSE)
 vsd <- log2(vsd)
 
-vsd2 <- as.data.frame(t(vsd))
-centered_data <- scale(vsd2, scale = FALSE)
-vsd3 <- as.data.frame(t(centered_data))
+centered_data <- scale(vsd, scale = FALSE)
 
 centroids <- "/mnt/cold1/snaketree/prj/hn/local/share/data/centroids_hn.xlsx"
 centroids <- read.xlsx(centroids, colNames = TRUE)
@@ -121,10 +123,10 @@ cl <- centroids
 cl$IMS <- NULL
 cl$BA <- NULL
 
-vsd3 <- as.data.frame(vsd3)
-vsd3$GENE <- rownames(vsd3)
+vsd <- as.data.frame(centered_data)
+vsd$GENE <- rownames(vsd)
 
-imsvsd <- merge(ims, vsd3, by="GENE")
+imsvsd <- merge(ims, vsd, by="GENE")
 
 # Initialize a dataframe to store results
 ims_correlations <- data.frame(
@@ -156,7 +158,7 @@ for (i in colnames(imsvsd)[2:37]) {
   ))
 }
 
-bavsd <- merge(ba, vsd3, by="GENE")
+bavsd <- merge(ba, vsd, by="GENE")
 
 # Initialize a dataframe to store results
 ba_correlations <- data.frame(
@@ -188,7 +190,7 @@ for (i in colnames(bavsd)[2:37]) {
   ))
 }
 
-clvsd <- merge(cl, vsd3, by="GENE")
+clvsd <- merge(cl, vsd, by="GENE")
 
 # Initialize a dataframe to store results
 cl_correlations <- data.frame(
@@ -203,140 +205,6 @@ clvsd$GENE <- NULL
 
 # Loop through columns 1 to 20
 for (i in colnames(clvsd)[2:37]) {
-  # Perform correlation test with column 21
-  j <- clvsd[,i]
-  cor_test <- cor.test(j, clvsd$CL, method = "pearson")
-  
-  # Extract estimate and p-value
-  estimate <- cor_test$estimate
-  p_value <- cor_test$p.value
-  
-  # Add results to the dataframe
-  cl_correlations <- rbind(cl_correlations, data.frame(
-    column = i,
-    estimate = estimate,
-    p_value = p_value,
-    stringsAsFactors = FALSE
-  ))
-}
-
-names(ba_correlations)[names(ba_correlations) =="estimate"] <- "cor_BA"
-names(cl_correlations)[names(cl_correlations) =="estimate"] <- "cor_CL"
-names(ims_correlations)[names(ims_correlations) =="estimate"] <- "cor_IMS"
-
-
-ba_correlations[ ba_correlations$p_value > 0.05, 'cor_BA'] <- -1
-cl_correlations[ cl_correlations$p_value > 0.05, 'cor_CL'] <- -1
-ims_correlations[ ims_correlations$p_value > 0.05, 'cor_IMS'] <- -1
-
-res <- merge(ba_correlations, cl_correlations, by="column")
-res$p_value.x <- NULL
-res$p_value.y <- NULL
-res <- merge(res, ims_correlations, by="column")
-res$p_value <- NULL
-
-
-dp <- res
-rownames(dp) <- dp$column
-dp$column <- NULL
-pheatmap(dp)
-
-table(colnames(dp)[apply(dp, 1, which.max)])
-
-## prendere TCGA e vedere se i numeri sono confrontabili con il paper
-
-tcga <- "/home/mferri/TCGA.HNSC.sampleMap_HiSeqV2.gz"
-tcga <- read.table(tcga, quote = "", sep = "\t", header = TRUE, stringsAsFactors = FALSE)
-rownames(tcga) <- tcga$sample
-tcga$sample <- NULL
-
-tcga <- as.data.frame(t(tcga))
-centered_data <- scale(tcga, scale = FALSE)
-tcga <- as.data.frame(t(centered_data))
-tcga <- scale(tcga, scale = TRUE)
-tcga <- as.data.frame(tcga)
-tcga$GENE <- rownames(tcga)
-
-
-imsvsd <- merge(ims, tcga, by="GENE")
-
-# Initialize a dataframe to store results
-ims_correlations <- data.frame(
-  column = character(),
-  estimate = numeric(),
-  p_value = numeric(),
-  stringsAsFactors = FALSE
-)
-
-rownames(imsvsd) <- imsvsd$GENE
-imsvsd$GENE <- NULL
-
-
-for (i in colnames(imsvsd)[2:567]) {
-  # Perform correlation test with column 21
-  j <- imsvsd[,i]
-  cor_test <- cor.test(j, imsvsd$IMS, method = "pearson")
-  
-  # Extract estimate and p-value
-  estimate <- cor_test$estimate
-  p_value <- cor_test$p.value
-  
-  # Add results to the dataframe
-  ims_correlations <- rbind(ims_correlations, data.frame(
-    column = i,
-    estimate = estimate,
-    p_value = p_value,
-    stringsAsFactors = FALSE
-  ))
-}
-
-bavsd <- merge(ba, tcga, by="GENE")
-
-# Initialize a dataframe to store results
-ba_correlations <- data.frame(
-  column = character(),
-  estimate = numeric(),
-  p_value = numeric(),
-  stringsAsFactors = FALSE
-)
-
-rownames(bavsd) <- bavsd$GENE
-bavsd$GENE <- NULL
-
-
-for (i in colnames(bavsd)[2:567]) {
-  # Perform correlation test with column 21
-  j <- bavsd[,i]
-  cor_test <- cor.test(j, bavsd$BA, method = "pearson")
-  
-  # Extract estimate and p-value
-  estimate <- cor_test$estimate
-  p_value <- cor_test$p.value
-  
-  # Add results to the dataframe
-  ba_correlations <- rbind(ba_correlations, data.frame(
-    column = i,
-    estimate = estimate,
-    p_value = p_value,
-    stringsAsFactors = FALSE
-  ))
-}
-
-clvsd <- merge(cl, tcga, by="GENE")
-
-# Initialize a dataframe to store results
-cl_correlations <- data.frame(
-  column = character(),
-  estimate = numeric(),
-  p_value = numeric(),
-  stringsAsFactors = FALSE
-)
-
-rownames(clvsd) <- clvsd$GENE
-clvsd$GENE <- NULL
-
-
-for (i in colnames(clvsd)[2:567]) {
   # Perform correlation test with column 21
   j <- clvsd[,i]
   cor_test <- cor.test(j, clvsd$CL, method = "pearson")

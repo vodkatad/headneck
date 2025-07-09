@@ -1,0 +1,81 @@
+set.seed(42)
+library(ggplot2)
+library(precrec)
+
+d <- read.table('/mnt/cold1/snaketree/prj/hn/local/share/data/cks_per_ROC.tsv', sep="\t", header=T, stringsAsFactors = F) 
+
+d$cetuxi <- factor(d$cetuxi, levels=c('s', 'r'))
+ggplot(data=d, aes(x=cetuxi, y=score_pos, fill=cetuxi))+geom_boxplot(outlier.shape=NA)+geom_jitter(aes(color=oral), height=0)+theme_bw(base_size=18)+
+  scale_fill_manual(values=c('blue', 'red'))+scale_color_manual(values=c('black', 'orange'))
+
+
+ggplot(data=d, aes(x=cetuxi, y=score_neg, fill=cetuxi))+geom_boxplot(outlier.shape=NA)+geom_jitter(aes(color=oral), height=0)+theme_bw(base_size=18)+
+  scale_fill_manual(values=c('blue', 'red'))+scale_color_manual(values=c('black', 'orange'))
+
+precrec_obj <- evalmod(scores = d$score_pos, labels = d$cetuxi, posclass='s', mode="rocprc", ties='equiv')
+#pdf(auc_all_f, height=2.5, width=2.5)
+autoplot(precrec_obj, curvetype = c("ROC"))
+#graphics.off()
+
+precrec_obj <- evalmod(scores = d$score_neg, labels = d$cetuxi, posclass='s', mode="rocprc", ties='equiv')
+#pdf(auc_all_f, height=2.5, width=2.5)
+autoplot(precrec_obj, curvetype = c("ROC"))
+#graphics.off()
+
+
+
+# define optimal threshold and try to apply on patients?
+get_sensitivity_specificity <- function(thr, df) {
+  p <- nrow(df[df$labels == 1,])
+  tp <- nrow(df[df$scores > thr & df$labels==1,])
+  n <- nrow(df[df$labels == 0,])
+  tn <- nrow(df[df$scores <= thr & df$labels==0,])
+  fn <- nrow(df[df$scores <= thr & df$labels==1,])
+  fp <- nrow(df[df$scores > thr & df$labels==0,])
+  return(c(tp/p, tn/n, tp, tn, fp, fn, fp/(fp+tp)))
+}
+
+compute_thr <- function(scores, labels) {
+  df <- data.frame(scores=scores, labels=labels)
+  intervals <- cut(scores, breaks=10)
+  max_i <- levels(intervals)
+  max_i <- gsub('(','', max_i, fixed=TRUE)
+  max_i <- gsub(']','', max_i, fixed=TRUE)
+  upper_bs <- sapply(strsplit(max_i, ','), '[[', 2)
+  upper_bs <- as.numeric(upper_bs)
+  upper_bs <- upper_bs[order(-upper_bs)]
+  res <- as.data.frame(t(sapply(upper_bs, get_sensitivity_specificity, df)))
+  colnames(res) <- c('sensitivity', 'specificity', 'tp', 'tn', 'fp', 'fn', 'fdr')
+  res$thr <- upper_bs
+  return(res)
+}
+
+sens <- compute_thr(d$score_neg, ifelse(d$cetuxi=='s', 1, 0))
+
+
+library(pROC)
+my_curve <- roc(predictor=d$score_pos, response=ifelse(d$cetuxi=='s', 1, 0))
+plot(my_curve, print.thres=TRUE)
+
+coords(my_curve, "best", best.method="closest.topleft")
+
+cposd <- coords(my_curve, "best")
+
+cpos <- cposd[1,1]
+
+my_curve <- roc(predictor=d$score_neg, response=ifelse(d$cetuxi=='s', 1, 0))
+plot(my_curve, print.thres=TRUE)
+
+cnegd <- coords(my_curve, "best")
+
+cneg <- cnegd[1,1]
+
+coords(my_curve, "best", best.method="closest.topleft")
+
+dp <- read.table('/mnt/cold1/snaketree/prj/hn/local/share/data/cks_per_ROC_patients.tsv', sep="\t", header=T, stringsAsFactors = F) 
+
+dp$labels <- ifelse(dp$cetuxi=='s', 1, 0)
+dp$scores <- dp$score_pos
+get_sensitivity_specificity(cpos, dp)
+dp$scores <- dp$score_neg
+get_sensitivity_specificity(cneg, dp)

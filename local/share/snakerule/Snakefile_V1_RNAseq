@@ -1,9 +1,9 @@
 include: "conf.sk"
 
 rule qc_plots:
-    input: counts=COUNTS_ALL, metadata=METADATA_ALL
+    input: counts=COUNTS_H, metadata=METADATA_CLUSTERING
     output: "dds.Rdata","tmm.tsv.gz", "vsd.tsv.gz"
-    params: tool=BIN_DIR+"/deseq2_qc_nolen", design="~Site+Cetuximab_Response+type", prefix="all", minc=5, minsamples=2, cores=CORES
+    params: tool=BIN_DIR+"/deseq2_qc_nolen", design="~classification", prefix="all", minc=5, minsamples=2, cores=CORES
     shell:
         """
             {params.tool} {input.counts} {input.metadata} {params.design} {params.prefix} {params.minc} {params.minsamples} {output} {params.cores}

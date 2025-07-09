@@ -3,7 +3,7 @@ library(DESeq2)
 library(ggplot2)
 library(ggrepel)
 
-register(MulticoreParam(as.numeric(snakemake@params[["threads"]])))
+#register(MulticoreParam(as.numeric(snakemake@params[["threads"]])))
 threads <- as.numeric(snakemake@params[["threads"]])
 parallel <- FALSE
 if (threads > 1) {
