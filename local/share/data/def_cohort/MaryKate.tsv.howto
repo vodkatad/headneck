@@ -1,0 +1,3 @@
+egrassi@ulisse:/mnt/cold1/snaketree/prj/hn/local/share/data$ cat MaryKate_reads/HPV_Lymphoma_Filtered/PDX/All_RemovedSamples_Unfiltered_GraftHNSCC_colData_240724.csv | tr "," "\t" | cut -f1,45 > def_cohort/MaryK
+ate.tsv
+

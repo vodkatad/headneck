@@ -79,3 +79,56 @@ dp$scores <- dp$score_pos
 get_sensitivity_specificity(cpos, dp)
 dp$scores <- dp$score_neg
 get_sensitivity_specificity(cneg, dp)
+
+### def version only score_pos 
+set.seed(42)
+library(ggplot2)
+library(precrec)
+
+d <- read.table('/mnt/cold1/snaketree/prj/hn/local/share/data/cks_per_ROC_3.tsv', sep="\t", header=T, stringsAsFactors = F) 
+
+cet <- read.table('/mnt/cold1/snaketree/prj/hn/local/share/data/def_cohort/MaryKate.tsv', sep="\t", header=T, stringsAsFactors = F)
+cet$smodel <- substr(cet$X, 0, 7)
+cet$X <- NULL
+cet <- cet[!duplicated(cet),]
+length(unique(cet$smodel))
+dim(cet)
+
+d$smodel <- d$Genealogy
+dim(d)
+
+# sanity check of RNaseq responses used by mk and new colors by Fra
+m <-  merge(d, cet, by="smodel")
+dim(m)
+table(m$cet, m$Definitive.resp)
+
+d$cetuxi <- factor(d$cet, levels=c('s', 'r'))
+ggplot(data=d, aes(x=cetuxi, y=score_pos, fill=cetuxi))+geom_boxplot(outlier.shape=NA)+geom_jitter(height=0)+theme_bw(base_size=18)+
+  scale_fill_manual(values=c('blue', 'red'))
+dim(d)
+
+precrec_obj <- evalmod(scores = d$score_pos, labels = d$cetuxi, posclass='s', mode="rocprc", ties='equiv')
+#pdf(auc_all_f, height=2.5, width=2.5)
+autoplot(precrec_obj, curvetype = c("ROC"))
+
+library(pROC)
+my_curve <- roc(predictor=d$score_pos, response=ifelse(d$cetuxi=='s', 1, 0))
+plot(my_curve, print.thres=TRUE)
+
+coords(my_curve, "best", best.method="closest.topleft")
+
+cposd <- coords(my_curve, "best")
+
+cpos <- cposd[1,1]
+
+dp <- read.table('/mnt/cold1/snaketree/prj/hn/local/share/data/cks_per_ROC_patients_3.tsv', sep="\t", header=T, stringsAsFactors = F) 
+
+dp$labels <- ifelse(dp$cetuxi=='PR', 1, 0)
+dp$cet <- ifelse(dp$cetuxi=='PR', 's', 'r')
+
+dp$scores <- dp$score_pos
+get_sensitivity_specificity(cpos, dp)
+
+dp$cet <- factor(dp$cet, levels=c('s', 'r'))
+ggplot(data=dp, aes(x=cet, y=score_pos, fill=cet))+geom_boxplot(outlier.shape=NA)+geom_jitter(height=0)+theme_bw(base_size=18)+
+  scale_fill_manual(values=c('blue', 'red'))+geom_hline(yintercept=4.5)
