@@ -1,6 +1,7 @@
 set.seed(42)
 library(ggplot2)
 library(precrec)
+library(pheatmap)
 
 d <- read.table('/mnt/cold1/snaketree/prj/hn/local/share/data/cks_per_ROC.tsv', sep="\t", header=T, stringsAsFactors = F) 
 
@@ -84,6 +85,8 @@ get_sensitivity_specificity(cneg, dp)
 set.seed(42)
 library(ggplot2)
 library(precrec)
+library(pheatmap)
+library(RColorBrewer)
 
 d <- read.table('/mnt/cold1/snaketree/prj/hn/local/share/data/cks_per_ROC_3.tsv', sep="\t", header=T, stringsAsFactors = F) 
 
@@ -113,13 +116,22 @@ autoplot(precrec_obj, curvetype = c("ROC"))
 
 library(pROC)
 my_curve <- roc(predictor=d$score_pos, response=ifelse(d$cetuxi=='s', 1, 0))
+pdf('~/ck_roc_fig5.pdf')
 plot(my_curve, print.thres=TRUE)
+graphics.off()
+
+ci(my_curve)
 
 coords(my_curve, "best", best.method="closest.topleft")
 
 cposd <- coords(my_curve, "best")
 
 cpos <- cposd[1,1]
+
+d$labels <- ifelse(d$cetuxi=='s', 1, 0)
+d$scores <- d$score_pos
+get_sensitivity_specificity(cpos, d)
+
 
 dp <- read.table('/mnt/cold1/snaketree/prj/hn/local/share/data/cks_per_ROC_patients_3.tsv', sep="\t", header=T, stringsAsFactors = F) 
 
@@ -132,3 +144,14 @@ get_sensitivity_specificity(cpos, dp)
 dp$cet <- factor(dp$cet, levels=c('s', 'r'))
 ggplot(data=dp, aes(x=cet, y=score_pos, fill=cet))+geom_boxplot(outlier.shape=NA)+geom_jitter(height=0)+theme_bw(base_size=18)+
   scale_fill_manual(values=c('blue', 'red'))+geom_hline(yintercept=4.5)
+
+dp$predict <- ifelse(dp$score_pos > cpos, 's', 'r')
+
+cfm <- as.matrix(table(dp$cet, dp$predict)) # on rows we have cet reality on columns the prediction
+
+pheatmap(cfm, cluster_cols = F, cluster_rows = F, display_numbers = T, fontsize_number=20, 
+         color = colorRampPalette(brewer.pal(n = 3, name ="YlGnBu"))(100), angle_col=0,
+         labels_row=c('Non Responder', 'Responder'), labels_col=c('Predicted Non Responder', 'Predicted Responder'),
+         filename='~/ck_confusionpatients_fig5G.pdf')#, labels_row = 'Response', labels_col='Prediction')
+
+
