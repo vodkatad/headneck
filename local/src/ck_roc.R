@@ -120,6 +120,10 @@ pdf('~/ck_roc_fig5.pdf')
 plot(my_curve, print.thres=TRUE)
 graphics.off()
 
+
+sd <- data.frame(my_curve$thresholds, my_curve$sensitivities, my_curve$specificities)
+write.table(sd, '~/hn_roc_sd_figure5.tsv', sep="\t", row.names = F)
+
 ci(my_curve)
 
 coords(my_curve, "best", best.method="closest.topleft")
@@ -154,4 +158,82 @@ pheatmap(cfm, cluster_cols = F, cluster_rows = F, display_numbers = T, fontsize_
          labels_row=c('Non Responder', 'Responder'), labels_col=c('Predicted Non Responder', 'Predicted Responder'),
          filename='~/ck_confusionpatients_fig5G.pdf')#, labels_row = 'Response', labels_col='Prediction')
 
+### sept 2026 ###############################################################
 
+library(pROC)
+set.seed(42)
+library(ggplot2)
+library(precrec)
+library(pheatmap)
+
+dp <- read.table('/mnt/cold1/snaketree/prj/hn/local/share/data/ck_sept2026.txt', sep="\t", header=T, stringsAsFactors = F) 
+dp$labels <- ifelse(dp$`Response.to.CETUXIMAB`=='RESPONDER', 1, 0)
+dp$cetuxi <- ifelse(dp$`Response.to.CETUXIMAB`=='RESPONDER', 's', 'r')
+
+### sanity check vs MK
+cet <- read.table('/mnt/cold1/snaketree/prj/hn/local/share/data/def_cohort/MaryKate.tsv', sep="\t", header=T, stringsAsFactors = F)
+cet$smodel <- substr(cet$X, 0, 7)
+cet$X <- NULL
+cet <- cet[!duplicated(cet),]
+length(unique(cet$smodel))
+dim(cet)
+
+dp$smodel <- dp$ID
+dim(dp)
+
+# sanity check of RNaseq responses used by mk and new colors by Fra
+m <-  merge(dp, cet, by="smodel")
+dim(m)
+table(m$cet, m$Definitive.resp)
+
+### sanity check vs old ck
+ck <- read.table('/mnt/cold1/snaketree/prj/hn/local/share/data/cks_per_ROC_3.tsv', sep="\t", header=T, stringsAsFactors = F)
+mm <- merge(ck,dp, by.y='smodel', by.x='Genealogy')
+nrow(ck)
+nrow(dp)
+nrow(mm)
+all(mm$CK1.IHC.SCORE==mm$CK1)
+all(mm$CK5.IHC.SCORE==mm$CK5)
+all(mm$CK10.IHC.SCORE==mm$CK10)
+
+###
+
+ggplot(data=dp, aes(x=cetuxi, y=overall.score, fill=cetuxi))+geom_boxplot(outlier.shape=NA)+geom_jitter(height=0)+theme_bw(base_size=18)+
+  scale_fill_manual(values=c('blue', 'red'))
+
+
+precrec_obj <- evalmod(scores = dp$overall.score, labels = dp$cetuxi, posclass='s', mode="rocprc", ties='equiv')
+#pdf(auc_all_f, height=2.5, width=2.5)
+autoplot(precrec_obj, curvetype = c("ROC"))
+
+my_curve <- roc(predictor=dp$overall.score, response=ifelse(dp$cetuxi=='s', 1, 0))
+plot(my_curve, print.thres=TRUE)
+ci(my_curve)
+my_curve$auc
+
+ggplot(data=dp, aes(x=cetuxi, y=pos.score, fill=cetuxi))+geom_boxplot(outlier.shape=NA)+geom_jitter(height=0)+theme_bw(base_size=18)+
+  scale_fill_manual(values=c('blue', 'red'))
+ggplot(data=dp, aes(x=cetuxi, y=-neg.score, fill=cetuxi))+geom_boxplot(outlier.shape=NA)+geom_jitter(height=0)+theme_bw(base_size=18)+
+  scale_fill_manual(values=c('blue', 'red'))
+precrec_obj <- evalmod(scores = dp$pos.score, labels = dp$cetuxi, posclass='s', mode="rocprc", ties='equiv')
+#pdf(auc_all_f, height=2.5, width=2.5)
+autoplot(precrec_obj, curvetype = c("ROC"))
+
+my_curve <- roc(predictor=dp$pos.score, response=ifelse(dp$cetuxi=='s', 1, 0))
+plot(my_curve, print.thres=TRUE)
+ci(my_curve)
+my_curve$auc
+
+dp$score_old <- dp$pos.score - dp$CK8.IHC.SCORE
+my_curve <- roc(predictor=dp$score_old, response=ifelse(dp$cetuxi=='s', 1, 0))
+plot(my_curve, print.thres=TRUE)
+ci(my_curve)
+my_curve$auc
+
+grade <- read.table('/mnt/cold1/snaketree/prj/hn/local/share/data/Supplementary_Data_1.txt', sep="\t", header=T, stringsAsFactors = F) 
+
+mg <- merge(dp, grade, by.x='smodel', by.y='Case.ID')
+mgg <- mg[mg$HISTOLOGICAL.GRADE!='',]
+nrow(mgg)
+
+fisher.test(table(mgg$HISTOLOGICAL.GRADE, mgg$Response.to.CETUXIMAB))
