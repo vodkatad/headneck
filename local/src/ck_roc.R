@@ -210,6 +210,10 @@ my_curve <- roc(predictor=dp$overall.score, response=ifelse(dp$cetuxi=='s', 1, 0
 plot(my_curve, print.thres=TRUE)
 ci(my_curve)
 my_curve$auc
+coords(my_curve, "best", best.method="closest.topleft")
+coords(my_curve, "best", best.method="youden")
+plot(my_curve, print.thres='all')
+plot(my_curve, print.thres='local maximas')
 
 ggplot(data=dp, aes(x=cetuxi, y=pos.score, fill=cetuxi))+geom_boxplot(outlier.shape=NA)+geom_jitter(height=0)+theme_bw(base_size=18)+
   scale_fill_manual(values=c('blue', 'red'))
@@ -237,3 +241,42 @@ mgg <- mg[mg$HISTOLOGICAL.GRADE!='',]
 nrow(mgg)
 
 fisher.test(table(mgg$HISTOLOGICAL.GRADE, mgg$Response.to.CETUXIMAB))
+ggplot(data=mgg, aes(x=HISTOLOGICAL.GRADE, y=overall.score, fill=cetuxi))+geom_boxplot(outlier.shape=NA)+geom_jitter(height=0)+theme_bw(base_size=18)+
+  scale_fill_manual(values=c('blue', 'red'))
+
+
+ggplot(data=mgg, aes(x=HISTOLOGICAL.GRADE, y=overall.score))+geom_boxplot(outlier.shape=NA)+geom_jitter(height=0)+theme_bw(base_size=18)
+
+
+wilcox.test(mgg[mgg$HISTOLOGICAL.GRADE=='g3', 'overall.score'], mgg[mgg$HISTOLOGICAL.GRADE=='g2' , 'overall.score'])
+wilcox.test(mgg[mgg$HISTOLOGICAL.GRADE=='g3', 'overall.score'], mgg[mgg$HISTOLOGICAL.GRADE!='g3' , 'overall.score'])
+
+d <- mgg[,c('CK1.IHC.SCORE','CK5.IHC.SCORE','CK8.IHC.SCORE','CK10.IHC.SCORE','CK18.IHC.SCORE', 'pos.score', 'overall.score')]
+
+annot_rows <- mgg[, c('Response.to.CETUXIMAB', 'HISTOLOGICAL.GRADE', 'Site.of.Primary')]
+
+library(pheatmap)
+minv <- min(d)
+maxv <- max(d)
+neutral_value <- mean(c(minv, maxv))
+
+bk1 <- c(seq(minv-0.1,neutral_value-0.1,by=0.2),neutral_value-0.0999)
+bk2 <- c(neutral_value+0.001, seq(neutral_value+0.1,maxv+0.1,by=0.2))
+bk <- c(bk1, bk2)
+my_palette <- c(colorRampPalette(colors = c("darkblue",
+                                            "lightblue"))(n = length(bk1)-1),
+                "#FFFFFF", #"snow1",
+                c(colorRampPalette(colors = c("tomato1", "darkred"))(n
+                                                                     = length(bk2)-1)))
+
+pheatmap(d, annotation_row=annot_rows, cluster_rows = T, cluster_cols=T,
+         breaks = bk, color=my_palette)
+
+
+mo <- glm(formula="labels~overall.score+HISTOLOGICAL.GRADE", data=mg, family='binomial')
+summary(mo)
+compute_thr(mg$overall.score, mg$labels)
+table(mg[mg$overall.score > 1.5 & mg$Response.to.CETUXIMAB=="RESPONDER",c('HISTOLOGICAL.GRADE')])
+table(mg[mg$overall.score <= 1.5 & mg$Response.to.CETUXIMAB=="RESPONDER",c('HISTOLOGICAL.GRADE')])
+table(mg[mg$overall.score <= 1.5 & mg$Response.to.CETUXIMAB=="NON RESPONDER",c('HISTOLOGICAL.GRADE')])
+
