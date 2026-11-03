@@ -208,11 +208,21 @@ autoplot(precrec_obj, curvetype = c("ROC"))
 
 my_curve <- roc(predictor=dp$overall.score, response=ifelse(dp$cetuxi=='s', 1, 0))
 plot(my_curve, print.thres=TRUE)
-ci(my_curve)
+ci(my_curve) # ci and aud
 my_curve$auc
-coords(my_curve, "best", best.method="closest.topleft")
+coords(my_curve, "best", best.method="closest.topleft") ### sensitivity and specificity for results
 coords(my_curve, "best", best.method="youden")
+
+pdf('/mnt/cold1/snaketree/prj/hn/local/share/data/ck_roc_fig5_compositescoreallCK.pdf')
+plot(my_curve, print.thres=TRUE)
+graphics.off()
+
+cposd <- coords(my_curve, "best")
+cpos <- cposd[1,1]
+
 plot(my_curve, print.thres='all')
+
+
 plot(my_curve, print.thres='local maximas')
 
 ggplot(data=dp, aes(x=cetuxi, y=pos.score, fill=cetuxi))+geom_boxplot(outlier.shape=NA)+geom_jitter(height=0)+theme_bw(base_size=18)+
@@ -228,6 +238,7 @@ plot(my_curve, print.thres=TRUE)
 ci(my_curve)
 my_curve$auc
 
+
 dp$score_old <- dp$pos.score - dp$CK8.IHC.SCORE
 my_curve <- roc(predictor=dp$score_old, response=ifelse(dp$cetuxi=='s', 1, 0))
 plot(my_curve, print.thres=TRUE)
@@ -241,15 +252,47 @@ mgg <- mg[mg$HISTOLOGICAL.GRADE!='',]
 nrow(mgg)
 
 fisher.test(table(mgg$HISTOLOGICAL.GRADE, mgg$Response.to.CETUXIMAB))
-ggplot(data=mgg, aes(x=HISTOLOGICAL.GRADE, y=overall.score, fill=cetuxi))+geom_boxplot(outlier.shape=NA)+geom_jitter(height=0)+theme_bw(base_size=18)+
-  scale_fill_manual(values=c('blue', 'red'))
+chisq.test(table(mgg$HISTOLOGICAL.GRADE, mgg$Response.to.CETUXIMAB))
+
+mgg$g2 <- ifelse(mgg$HISTOLOGICAL.GRADE == 'g2', 'g2', 'g3')
+mgg$g3 <- ifelse(mgg$HISTOLOGICAL.GRADE == 'g3', 'g3', 'g2')
+
+fisher.test(table(mgg$g2, mgg$Response.to.CETUXIMAB))
+fisher.test(table(mgg$g3, mgg$Response.to.CETUXIMAB))
+
+chisq.test(table(mgg$g2, mgg$Response.to.CETUXIMAB))
+chisq.test(table(mgg$g3, mgg$Response.to.CETUXIMAB))
+
+
+ggplot(data=mgg, aes(x=HISTOLOGICAL.GRADE, y=overall.score, fill=cetuxi))+geom_boxplot(outlier.shape=NA, position = position_dodge(1))+
+  geom_jitter(size=1.5, position = position_jitterdodge(
+    jitter.width = 0.65,   # Larghezza della dispersione casuale dei punti
+    jitter.height = 0,
+    dodge.width = 1      # Deve corrispondere al dodge del boxplot
+  ))+theme_bw(base_size=18)+
+  scale_fill_manual(values=c('red', 'blue'))+ylab('Cumulative IHC score')+xlab('Tumor grade')+ylim(-3, 8)
+
+ggplot(data=mgg, aes(x=HISTOLOGICAL.GRADE, y=overall.score, fill=cetuxi))+geom_boxplot(varwidth = TRUE)+
+  theme_bw(base_size=18)+
+  scale_fill_manual(values=c('red', 'blue'))+ylab('Cumulative IHC score')+xlab('Tumor grade')+ylim(-1, 6)
+
+
 
 
 ggplot(data=mgg, aes(x=HISTOLOGICAL.GRADE, y=overall.score))+geom_boxplot(outlier.shape=NA)+geom_jitter(height=0)+theme_bw(base_size=18)
 
+########################333 nuova suppl CK grade
+mgg$bigrade <- ifelse(mgg$HISTOLOGICAL.GRADE == 'g2', 'g2', 'g3')
+ggplot(data=mgg, aes(x=bigrade, y=overall.score))+geom_boxplot(outlier.shape=NA)+geom_jitter(height=0)+theme_bw(base_size=18)+xlab('Bi-Grade')
+wilcox.test(mgg[mgg$bigrade=='g3', 'overall.score'], mgg[mgg$bigrade=='g2' , 'overall.score'])
 
+##############################3
+
+kruskal.test(mgg$overall.score, mgg$HISTOLOGICAL.GRADE)
 wilcox.test(mgg[mgg$HISTOLOGICAL.GRADE=='g3', 'overall.score'], mgg[mgg$HISTOLOGICAL.GRADE=='g2' , 'overall.score'])
-wilcox.test(mgg[mgg$HISTOLOGICAL.GRADE=='g3', 'overall.score'], mgg[mgg$HISTOLOGICAL.GRADE!='g3' , 'overall.score'])
+#wilcox.test(mgg[mgg$HISTOLOGICAL.GRADE=='g3', 'overall.score'], mgg[mgg$HISTOLOGICAL.GRADE!='g3' , 'overall.score'])
+wilcox.test(mgg[mgg$HISTOLOGICAL.GRADE=='g2-g3', 'overall.score'], mgg[mgg$HISTOLOGICAL.GRADE=='g3' , 'overall.score'])
+wilcox.test(mgg[mgg$HISTOLOGICAL.GRADE=='g2', 'overall.score'], mgg[mgg$HISTOLOGICAL.GRADE=='g2-g3' , 'overall.score'])
 
 d <- mgg[,c('CK1.IHC.SCORE','CK5.IHC.SCORE','CK8.IHC.SCORE','CK10.IHC.SCORE','CK18.IHC.SCORE', 'pos.score', 'overall.score')]
 
@@ -272,11 +315,128 @@ my_palette <- c(colorRampPalette(colors = c("darkblue",
 pheatmap(d, annotation_row=annot_rows, cluster_rows = T, cluster_cols=T,
          breaks = bk, color=my_palette)
 
+mgg <- mg[mg$HISTOLOGICAL.GRADE != '',]
 
-mo <- glm(formula="labels~overall.score+HISTOLOGICAL.GRADE", data=mg, family='binomial')
+mgg$ograde <- mgg$HISTOLOGICAL.GRADE
+mgg$grade <- ifelse(mgg$HISTOLOGICAL.GRADE == 'g2', 'g2', 'g3')
+mo <- glm(formula="labels~overall.score+grade", data=mgg, family='binomial')
 summary(mo)
-compute_thr(mg$overall.score, mg$labels)
-table(mg[mg$overall.score > 1.5 & mg$Response.to.CETUXIMAB=="RESPONDER",c('HISTOLOGICAL.GRADE')])
-table(mg[mg$overall.score <= 1.5 & mg$Response.to.CETUXIMAB=="RESPONDER",c('HISTOLOGICAL.GRADE')])
-table(mg[mg$overall.score <= 1.5 & mg$Response.to.CETUXIMAB=="NON RESPONDER",c('HISTOLOGICAL.GRADE')])
 
+mgg$grade2 <- ifelse(mgg$HISTOLOGICAL.GRADE == 'g3', 'g3', 'g2')
+mo <- glm(formula="labels~overall.score+grade2", data=mgg, family='binomial')
+summary(mo)
+
+
+compute_thr(mg$overall.score, mg$labels)
+table(mgg[mgg$overall.score > 3.5, 'Response.to.CETUXIMAB'])
+
+mgg$predict <- ifelse(mgg$overall.score > cpos, 's', 'r')
+
+cfm <- as.matrix(table(mgg$cet, mgg$predict)) # on rows we have cet reality on columns the prediction
+
+pheatmap(cfm, cluster_cols = F, cluster_rows = F, display_numbers = T, fontsize_number=20, 
+         color = colorRampPalette(brewer.pal(n = 3, name ="YlGnBu"))(100), angle_col=0,
+         labels_row=c('Non Responder', 'Responder'), labels_col=c('Predicted Non Responder', 'Predicted Responder'))#, labels_row = 'Response', labels_col='Prediction')
+
+
+table(mgg[mgg$overall.score > 3.5 & mgg$Response.to.CETUXIMAB=="RESPONDER",'grade'])
+table(mgg[mgg$overall.score <= 3.5 & mgg$Response.to.CETUXIMAB=="RESPONDER",c('HISTOLOGICAL.GRADE')])
+table(mgg[mgg$overall.score <= 3.5 & mgg$Response.to.CETUXIMAB=="NON RESPONDER",c('HISTOLOGICAL.GRADE')])
+
+
+# se score < 3.5 uso anche grade
+mgg$predict <- ifelse(mgg$overall.score > cpos, 's', ifelse(mgg$grade=='g3', 'r', 's'))
+                      
+cfm <- as.matrix(table(mgg$cet, mgg$predict)) # on rows we have cet reality on columns the prediction
+pheatmap(cfm, cluster_cols = F, cluster_rows = F, display_numbers = T, fontsize_number=20, 
+         color = colorRampPalette(brewer.pal(n = 3, name ="YlGnBu"))(100), angle_col=0,
+         labels_row=c('Non Responder', 'Responder'), labels_col=c('Predicted Non Responder', 'Predicted Responder'))#, labels_row = 'Response', labels_col='Prediction')
+
+
+
+# se score > 3.5 uso anche grade
+mgg$predict <- ifelse(mgg$overall.score < cpos, 'r', ifelse(mgg$grade=='g3', 'r', 's'))
+
+cfm <- as.matrix(table(mgg$cet, mgg$predict)) # on rows we have cet reality on columns the prediction
+pheatmap(cfm, cluster_cols = F, cluster_rows = F, display_numbers = T, fontsize_number=20, 
+         color = colorRampPalette(brewer.pal(n = 3, name ="YlGnBu"))(100), angle_col=0,
+         labels_row=c('Non Responder', 'Responder'), labels_col=c('Predicted Non Responder', 'Predicted Responder'))#, labels_row = 'Response', labels_col='Prediction')
+
+
+# or
+mgg$predict <- ifelse(mgg$overall.score < cpos | mgg$grade =='g2', 's', 'r')
+
+cfm <- as.matrix(table(mgg$cet, mgg$predict)) # on rows we have cet reality on columns the prediction
+pheatmap(cfm, cluster_cols = F, cluster_rows = F, display_numbers = T, fontsize_number=20, 
+         color = colorRampPalette(brewer.pal(n = 3, name ="YlGnBu"))(100), angle_col=0,
+         labels_row=c('Non Responder', 'Responder'), labels_col=c('Predicted Non Responder', 'Predicted Responder'))#, labels_row = 'Response', labels_col='Prediction')
+
+
+get_sensitivity_specificity_2 <- function(df) {
+  p <- nrow(df[df$labels == 1,])
+  tp <- nrow(df[df$pred & df$labels==1,])
+  n <- nrow(df[df$labels == 0,])
+  tn <- nrow(df[!df$pred & df$labels==0,])
+  fn <- nrow(df[!df$pred & df$labels==1,])
+  fp <- nrow(df[df$pred & df$labels==0,])
+  return(c(tp/p, tn/n, tp, tn, fp, fn, fp/(fp+tp)))
+}
+
+mgg$pred <- mgg$overall.score > 3.5
+get_sensitivity_specificity_2(mgg)
+
+
+mgg$pred <-  ifelse(mgg$overall.score < cpos, F, ifelse(mgg$grade=='g3', F, T))
+get_sensitivity_specificity_2(mgg)
+
+mgg$pred <- ifelse(mgg$overall.score > cpos, T, ifelse(mgg$grade=='g3', F, T))
+get_sensitivity_specificity_2(mgg)
+
+mgg$pred <- mgg$overall.score > 3.5 & mgg$grade == 'g2'
+get_sensitivity_specificity_2(mgg)
+
+
+# demorgan
+mgg$pred <- !(mgg$overall.score < 3.5 | mgg$grade == 'g3')
+get_sensitivity_specificity_2(mgg)
+
+
+# check
+mg$pred <- mg$overall.score > 3.5
+get_sensitivity_specificity_2(mg)
+
+
+###
+mgg$pred <- mgg$overall.score > 3.5 & mgg$grade == 'g2'
+get_sensitivity_specificity_2(mgg)
+
+
+mgg$pred <- mgg$overall.score > 3.5 | mgg$grade == 'g2'
+get_sensitivity_specificity_2(mgg)
+
+### versioni grade g2 g3 only ###################
+# se score < 3.5 uso anche grade
+mgg$predict <- ifelse(mgg$overall.score > cpos, 's', ifelse(mgg$ograde=='g3', 'r', 's'))
+
+mgg$pred <- ifelse(mgg$overall.score > cpos, T, ifelse(mgg$ograde=='g3', F, T))
+get_sensitivity_specificity_2(mgg)
+
+
+cfm <- as.matrix(table(mgg$cet, mgg$predict)) # on rows we have cet reality on columns the prediction
+pheatmap(cfm, cluster_cols = F, cluster_rows = F, display_numbers = T, fontsize_number=20, 
+         color = colorRampPalette(brewer.pal(n = 3, name ="YlGnBu"))(100), angle_col=0,
+         labels_row=c('Non Responder', 'Responder'), labels_col=c('Predicted Non Responder', 'Predicted Responder'))#, labels_row = 'Response', labels_col='Prediction')
+
+
+
+# se score > 3.5 uso anche grade
+mgg$predict <- ifelse(mgg$overall.score < cpos, 'r', ifelse(mgg$ograde=='g3', 'r', 's'))
+
+mgg$pred <-  ifelse(mgg$overall.score < cpos, F, ifelse(mgg$ograde=='g3', F, T))
+get_sensitivity_specificity_2(mgg)
+
+
+cfm <- as.matrix(table(mgg$cet, mgg$predict)) # on rows we have cet reality on columns the prediction
+pheatmap(cfm, cluster_cols = F, cluster_rows = F, display_numbers = T, fontsize_number=20, 
+         color = colorRampPalette(brewer.pal(n = 3, name ="YlGnBu"))(100), angle_col=0,
+         labels_row=c('Non Responder', 'Responder'), labels_col=c('Predicted Non Responder', 'Predicted Responder'))#, labels_row = 'Response', labels_col='Prediction')
