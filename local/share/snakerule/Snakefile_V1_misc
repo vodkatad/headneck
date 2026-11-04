@@ -4,3 +4,9 @@ rule chisq_ck:
 	input: n=DATA_DIR+"/citokeratins_{class}.tsv"
 	output: stat="citokeratins_{class}.txt"
 	script: SRC_DIR+"/chisq_fisher.R"
+
+
+rule revision_fisher_ck:
+    output: "ck_revision.tsv"
+    params: tool=BIN_DIR+"/contingency_test_various_fisher_ck_revision"
+    shell: "{params.tool} > {output}"
