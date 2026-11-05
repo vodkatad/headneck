@@ -254,6 +254,14 @@ nrow(mgg)
 fisher.test(table(mgg$HISTOLOGICAL.GRADE, mgg$Response.to.CETUXIMAB))
 chisq.test(table(mgg$HISTOLOGICAL.GRADE, mgg$Response.to.CETUXIMAB))
 
+library(DescTools)
+MHChisqTest(table(mgg$HISTOLOGICAL.GRADE, mgg$Response.to.CETUXIMAB))
+
+# cambia?
+dd <- as.matrix(table(mgg$HISTOLOGICAL.GRADE, mgg$Response.to.CETUXIMAB))
+dd <- dd[c(3,1,2),]
+MHChisqTest(dd)
+
 mgg$g2 <- ifelse(mgg$HISTOLOGICAL.GRADE == 'g2', 'g2', 'g3')
 mgg$g3 <- ifelse(mgg$HISTOLOGICAL.GRADE == 'g3', 'g3', 'g2')
 
@@ -264,18 +272,38 @@ chisq.test(table(mgg$g2, mgg$Response.to.CETUXIMAB))
 chisq.test(table(mgg$g3, mgg$Response.to.CETUXIMAB))
 
 
+#VERDE: R55 G 100 B 15
+#VIOLA: R110 G 0 B 150
+viola <- rgb(110,0, 150, maxColorValue=255)
+verde <- rgb(55,100, 15, maxColorValue=255)
+
+guess_ticks <- function(values, nticks=5, fixed_max=NULL, fixed_min=0) {
+  vmax <- max(values)
+  if (is.null(fixed_max)) {
+    round_max <- ceiling(vmax)
+  } else {
+    round_max <- fixed_max
+  }
+  my_breaks <- seq(fixed_min, round_max, length.out=nticks)
+  return(my_breaks)
+}
+
+y_breaks <- guess_ticks(mgg$overall.score, fixed_min=-2, fixed_max=10)
+
 ggplot(data=mgg, aes(x=HISTOLOGICAL.GRADE, y=overall.score, fill=cetuxi))+geom_boxplot(outlier.shape=NA, position = position_dodge(1))+
-  geom_jitter(size=1.5, position = position_jitterdodge(
+  geom_jitter(size=1, position = position_jitterdodge(
     jitter.width = 0.65,   # Larghezza della dispersione casuale dei punti
     jitter.height = 0,
     dodge.width = 1      # Deve corrispondere al dodge del boxplot
-  ))+theme_bw(base_size=18)+
-  scale_fill_manual(values=c('red', 'blue'))+ylab('Cumulative IHC score')+xlab('Tumor grade')+ylim(-3, 8)
+  ))+theme_classic(base_size=18)+labs(dictionary=c(cetuxi=""))+
+  scale_y_continuous(breaks=y_breaks,limits=c(min(y_breaks), max(y_breaks)),expand = c(0, 0))+
+  scale_fill_manual(values=c(viola, verde), labels = c("Non-responders", "Responders"))+ylab('Cumulative IHC score')+xlab('Tumor grade')
 
 ggplot(data=mgg, aes(x=HISTOLOGICAL.GRADE, y=overall.score, fill=cetuxi))+geom_boxplot(varwidth = TRUE)+
   theme_bw(base_size=18)+
-  scale_fill_manual(values=c('red', 'blue'))+ylab('Cumulative IHC score')+xlab('Tumor grade')+ylim(-1, 6)
-
+  scale_fill_manual(values=c(viola, verde), labels = c("Non-responders", "Responders"))+ylab('Cumulative IHC score')+xlab('Tumor grade')+
+  scale_y_continuous(breaks=y_breaks,limits=c(min(y_breaks), max(y_breaks)),expand = c(0, 0))+
+  theme_classic(base_size=18)+labs(dictionary=c(cetuxi=""))
 
 
 

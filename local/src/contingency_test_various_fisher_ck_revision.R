@@ -209,3 +209,8 @@ MHChisqTest(matBA, srow = c(1,2), scol = c(1,2))
 
 m <- rbind(matBA[1,], matCL[1,], matIMS[1,])
 MHChisqTest(m)
+fisher.test(m)
+
+matBA2 <- matrix(c(199,11,2,8), ncol=2)
+MHChisqTest(matBA2)
+our_fisher_standard_or_and_ic(matBA2)
