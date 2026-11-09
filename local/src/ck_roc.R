@@ -158,7 +158,7 @@ pheatmap(cfm, cluster_cols = F, cluster_rows = F, display_numbers = T, fontsize_
          labels_row=c('Non Responder', 'Responder'), labels_col=c('Predicted Non Responder', 'Predicted Responder'),
          filename='~/ck_confusionpatients_fig5G.pdf')#, labels_row = 'Response', labels_col='Prediction')
 
-### sept 2026 ###############################################################
+### sept 2026 ###########################################################################################################
 
 library(pROC)
 set.seed(42)
@@ -213,6 +213,7 @@ my_curve$auc
 coords(my_curve, "best", best.method="closest.topleft") ### sensitivity and specificity for results
 coords(my_curve, "best", best.method="youden")
 
+### HERE roc
 pdf('/mnt/cold1/snaketree/prj/hn/local/share/data/ck_roc_fig5_compositescoreallCK.pdf')
 plot(my_curve, print.thres=TRUE)
 graphics.off()
@@ -306,10 +307,36 @@ ggplot(data=mgg, aes(x=HISTOLOGICAL.GRADE, y=overall.score, fill=cetuxi))+geom_b
   theme_classic(base_size=18)+labs(dictionary=c(cetuxi=""))
 
 
+y_breaks <- guess_ticks(mgg$overall.score, fixed_min=-2, fixed_max=10)
 
-ggplot(data=mgg, aes(x=HISTOLOGICAL.GRADE, y=overall.score))+geom_boxplot(outlier.shape=NA)+geom_jitter(height=0)+theme_bw(base_size=18)
+#### Suppl 1 IHC vs grade     HERE
+ggplot(data=mgg, aes(x=HISTOLOGICAL.GRADE, y=overall.score))+geom_boxplot(outlier.shape=NA)+
+scale_fill_manual(values=c(viola, verde), labels = c("Non-responders", "Responders"))+ylab('Cumulative IHC score')+xlab('Tumor grade')+
+scale_y_continuous(breaks=y_breaks,limits=c(min(y_breaks), max(y_breaks)),expand = c(0, 0))+
+geom_jitter(height=0, size=1)+theme_classic(base_size=18)
 
-########################333 nuova suppl CK grade
+#### Suppl 2 grade vs resp     HERE
+pdf <- as.data.frame(table(mgg$cetuxi, mgg$HISTOLOGICAL.GRADE))
+library(dplyr)
+pdf_plot <- pdf %>%
+  group_by(Var1) %>%
+  mutate(Perc = Freq / sum(Freq) * 100) %>%
+  ungroup()
+
+pdf_plot$Var1 <- ifelse(pdf_plot$Var1 == 'r', 'Non-responders', 'Responders')
+
+ggplot(pdf_plot, aes(x = Var2, y = Perc, fill = Var1)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  geom_text(aes(label = paste0(round(Perc, 1), "%\n(n=", Freq, ")")),
+            position = position_dodge(width = 0.8), vjust = -0.3, size = 3.5) +
+  scale_y_continuous(labels = function(x) paste0(x, "%"), limits=c(0, 60), expand = c(0, 0)) +
+  scale_fill_manual(values = c("Responders" = "#1d7937", "Non-responders" = "#772b84"),
+                    breaks = c("Responders", "Non-responders")) +
+  labs(x = NULL, y = "% of group total", fill = NULL) +
+  theme_classic(base_size = 14)
+
+
+########################333 nuova suppl CK grade ############################
 mgg$bigrade <- ifelse(mgg$HISTOLOGICAL.GRADE == 'g2', 'g2', 'g3')
 ggplot(data=mgg, aes(x=bigrade, y=overall.score))+geom_boxplot(outlier.shape=NA)+geom_jitter(height=0)+theme_bw(base_size=18)+xlab('Bi-Grade')
 wilcox.test(mgg[mgg$bigrade=='g3', 'overall.score'], mgg[mgg$bigrade=='g2' , 'overall.score'])
